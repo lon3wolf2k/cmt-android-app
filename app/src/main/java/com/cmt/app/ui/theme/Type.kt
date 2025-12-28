@@ -1,4 +1,4 @@
-﻿package com.cmt.app.ui.theme
+package com.cmt.app.ui.theme
 
 import androidx.compose.material3.Typography
 
