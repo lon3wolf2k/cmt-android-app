@@ -12,13 +12,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.cmt.app.data.fileExistsAndHasSize
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.tileprovider.modules.OfflineTileProvider
+import org.osmdroid.tileprovider.modules.SimpleRegisterReceiver
+import org.osmdroid.tileprovider.tilesource.FileBasedTileSource
 import org.osmdroid.views.MapView
+import android.util.Log
+import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -129,11 +136,18 @@ fun MapScreen(
     onGoHome: () -> Unit
 ) {
     val context = LocalContext.current
+    val mbtilesFile = remember {
+        context.getExternalFilesDir(null)?.let { baseDir ->
+            File(baseDir, "maps/corfu.mbtiles")
+        }
+    }
+    val registerReceiver = remember { SimpleRegisterReceiver(context) }
     val mapView = remember {
         MapView(context).apply {
             setMultiTouchControls(true)
-            controller.setZoom(14.0)
-            controller.setCenter(GeoPoint(0.0, 0.0))
+            setUseDataConnection(false)
+            controller.setZoom(11.0)
+            controller.setCenter(GeoPoint(39.6243, 19.9217))
         }
     }
 
@@ -142,6 +156,28 @@ fun MapScreen(
         onDispose {
             mapView.onPause()
             mapView.onDetach()
+        }
+    }
+
+    LaunchedEffect(mbtilesFile) {
+        if (mbtilesFile != null && fileExistsAndHasSize(mbtilesFile)) {
+            try {
+                val provider = OfflineTileProvider(registerReceiver, arrayOf(mbtilesFile))
+                mapView.setTileProvider(provider)
+                val tileSourceName = provider.tileSources.firstOrNull()
+                val tileSource = tileSourceName?.let { FileBasedTileSource.getSource(it) }
+                if (tileSource != null) {
+                    mapView.setTileSource(tileSource)
+                }
+                mapView.setUseDataConnection(false)
+                mapView.controller.setZoom(11.0)
+                mapView.controller.setCenter(GeoPoint(39.6243, 19.9217))
+                mapView.invalidate()
+            } catch (e: Exception) {
+                Log.e("MapScreen", "Failed to load offline tiles: ${e.message}", e)
+            }
+        } else {
+            Log.i("MapScreen", "Offline MBTiles not available yet; using default tiles")
         }
     }
 
